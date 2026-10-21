@@ -56,6 +56,8 @@
 //! assert_eq!(Square(2.0).describe(), "a shape with area 4");
 //! ```
 
+use core::ops::Deref;
+
 pub use delegate_trait_macros::delegate_trait;
 
 /// Implementing DelegateProvider for a struct enables blanket implementations of traits
@@ -80,5 +82,14 @@ impl<T: ?Sized> DelegateRef<'_, T> {
     /// Wrap a reference to a delegate target.
     pub fn new<'a>(target: &'a T) -> DelegateRef<'a, T> {
         DelegateRef { target }
+    }
+}
+
+impl<T: ?Sized> Deref for DelegateRef<'_, T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        self.target
     }
 }

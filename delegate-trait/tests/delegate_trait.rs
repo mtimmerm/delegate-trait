@@ -67,3 +67,10 @@ fn generic_trait_and_type() {
     let target: &dyn Valued<u32> = w.delegate_ref().target;
     assert_eq!(target.value(), 42);
 }
+
+#[test]
+fn deref_to_target() {
+    assert_eq!(Unit.delegate_ref().name(), "unit");
+    let target: &dyn Named = &*Unit.delegate_ref();
+    assert_eq!(target.name(), "unit");
+}
