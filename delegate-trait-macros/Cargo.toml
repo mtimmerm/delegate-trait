@@ -1,0 +1,22 @@
+[package]
+name = "delegate-trait-macros"
+description = "Procedural macros for the `delegate-trait` crate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/delegate-trait-macros"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }
+
+[lints]
+workspace = true

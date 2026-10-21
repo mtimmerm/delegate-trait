@@ -1,0 +1,17 @@
+[workspace]
+resolver = "3"
+members = ["delegate-trait", "delegate-trait-macros"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+keywords = ["delegate", "delegation", "trait", "macro", "blanket-impl"]
+categories = ["rust-patterns"]
+
+[workspace.dependencies]
+delegate-trait-macros = { version = "=0.1.0", path = "delegate-trait-macros" }
+
+[workspace.lints.rust]
+missing_docs = "warn"
