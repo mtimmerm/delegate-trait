@@ -1,74 +1,131 @@
 # delegate-trait
 
-Delegation support for blanket trait implementations in Rust.
+`delegate-trait` lets library authors provide downstream crates with automatic
+implementations of (possibly many) traits by implementing a single
+"delegate" trait.
 
-A type implements `DelegateProvider` to expose a `DelegateRef` to some target,
-usually a `dyn Trait` view of itself. Library authors can then write blanket
-implementations of their traits for every `T: DelegateProvider` whose
-`DelegateRef<'_, T::Target>` implements a suitable delegate trait.
-`DelegateRef<'_, T>` derefs to `T`.
+For example, a library author could provide some traits that are expected
+to be commonly implemented:
 
-The `#[delegate_trait(Trait)]` attribute implements
-`DelegateProvider<Target = dyn Trait>` for a struct, enum, or union.
+```rust
+trait Surface {
+  fn area(&self) -> f64;
+}
+
+trait Body {
+  fn volume(&self) -> f64;
+}
+```
+To allow these traits to be automatically implemented based on delegate
+traits that they or other library authors write later, they can provide
+blanket implementations like this:
+
+```rust
+use delegate_trait::DelegateProvider;
+
+impl<T> Surface for T
+where
+    T: DelegateProvider,
+    T::Target: Surface,
+{
+    #[inline]
+    fn area(&self) -> f64 {
+        self.delegate_ref().area()
+    }
+}
+
+impl<T> Body for T
+where
+    T: DelegateProvider,
+    T::Target: Body,
+{
+    #[inline]
+    fn volume(&self) -> f64 {
+        self.delegate_ref().volume()
+    }
+}
+```
+
+A possibly different crate can then create traits that can provide automatic implementations of these:
+
+```rust
+use delegate_trait::delegate_trait;
+
+#[delegate_trait(CubicDelegate)]
+pub trait Cubic {
+  fn side(&self) -> f64;
+  fn surface_area(&self) -> f64 {
+    let s = self.side();
+    s*s*6.0
+  }
+  fn body_volume(&self) -> f64 {
+    let s = self.side();
+    s*s*s
+  }
+}
+
+impl Surface for dyn CubicDelegate {
+  #[inline]
+  fn area(&self) -> f64 {
+    self.surface_area()
+  }
+}
+
+impl Body for dyn CubicDelegate {
+  #[inline]
+  fn volume(&self) -> f64 {
+    self.body_volume()
+  }
+}
+```
+
+When applied to a trait, as above, the `#[delegate_trait(CubicDelegate)]` attribute just
+declares an empty subtrait `pub trait CubicDelegate: Cubic`.  This is provided as a separate
+trait to use in `DelegateProvider` to avoid conflicts.  There is no reason to use
+a `dyn CubicDelegate` for any other purpose.
+
+Now, any type can pick up the common traits for free:
+
+```rust
+use delegate_trait::delegate_trait;
+
+#[delegate_trait(CubicDelegate)]
+pub struct UnitCube {}
+
+impl Cubic for UnitCube {
+  fn side(&self) -> f64 {
+    1.0
+  }
+}
+
+fn get_unit_cube_surface() -> impl Surface {
+  // UnitCube implements Surface for free
+  UnitCube{}
+}
+
+fn get_unit_cube_body() -> impl Body {
+  // UnitCube implements Body for free
+  UnitCube{}
+}
+```
+
+When used on a struct, union, or enum, as above, the `#[delegate_trait(CubicDelegate)]` attribute implements
+the `CubicDelegate` marker subtrait on the struct, as well as the `DelegateProvider<Target = dyn CubicDelegate>`
+trait, which allows the blanket implementations of `Surface` and `Body` to apply.
+
+Since `Cubic` is a supertrait of `CubicDelegate`, it must then be implemented for the struct.
+
+The annotated type must be `'static`. On a type, the attribute also accepts extra
+trait object bounds, such as `#[delegate_trait(CubicDelegate + Send + Sync)]`.
+They're added to the `dyn` target, so the type only picks up traits
+implemented for `dyn CubicDelegate + Send + Sync`.
 
 ## Crates
 
 | Crate | Description |
 | --- | --- |
-| [`delegate-trait`](delegate-trait) | `DelegateProvider`, `DelegateRef`, and a re-export of the macros. Depend on this one. |
+| [`delegate-trait`](delegate-trait) | `DelegateProvider` and a re-export of the macro. Depend on this one. |
 | [`delegate-trait-macros`](delegate-trait-macros) | The `#[delegate_trait(...)]` procedural macro. |
-
-## Example
-
-```rust
-use delegate_trait::{DelegateProvider, DelegateRef, delegate_trait};
-
-/// The trait that users implement.
-trait Shape {
-    fn area(&self) -> f64;
-}
-
-/// The trait that the library wants every `Shape` provider to implement.
-trait Describe {
-    fn describe(&self) -> String;
-}
-
-/// How a `DelegateRef` to a `dyn Shape` implements `Describe`.
-trait DescribeDelegate {
-    fn describe(&self) -> String;
-}
-
-impl DescribeDelegate for DelegateRef<'_, dyn Shape> {
-    fn describe(&self) -> String {
-        format!("a shape with area {}", self.area())
-    }
-}
-
-impl<T> Describe for T
-where
-    T: DelegateProvider,
-    for<'a> DelegateRef<'a, T::Target>: DescribeDelegate,
-{
-    fn describe(&self) -> String {
-        self.delegate_ref().describe()
-    }
-}
-
-#[delegate_trait(Shape)]
-struct Square(f64);
-
-impl Shape for Square {
-    fn area(&self) -> f64 {
-        self.0 * self.0
-    }
-}
-
-assert_eq!(Square(2.0).describe(), "a shape with area 4");
-```
-
-The attribute accepts any trait object bounds, such as
-`#[delegate_trait(MyTrait<u32> + Send + Sync)]`. The annotated type must
-implement the trait(s) and be `'static`.
 
 ## Development
 
